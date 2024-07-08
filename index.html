@@ -3,7 +3,198 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>World Happiness Report - Segmented Horizontal Bar Chart with Tooltip</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+      }
+      .axis text {
+        font-size: 12px;
+      }
+      .axis-label {
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .legend-item {
+        font-size: 12px;
+      }
+      .legend-color {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 5px;
+      }
+      .tooltip {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 1px solid #ddd;
+        padding: 10px;
+        font-size: 12px;
+        pointer-events: none;
+      }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <h1>World Happiness Report - Segmented Horizontal Bar Chart with Tooltip</h1>
+    <script>
+      function handleData(data) {
+        // Filter out countries with missing data
+        data = data.filter((d) => !isNaN(d['Ladder score']) && d['Ladder score'] !== '');
+
+        // Sort data by Ladder score in descending order
+        data.sort((a, b) => b['Ladder score'] - a['Ladder score']);
+
+        // Add rank to each country
+        data.forEach((d, i) => {
+          d.rank = i + 1;
+        });
+
+        // Set up dimensions and margins
+        const margin = { top: 30, right: 250, bottom: 70, left: 200 };
+        const width = 1200 - margin.left - margin.right;
+        const height = 2000 - margin.top - margin.bottom;
+
+        // Define color scale and segments
+        const segments = [
+          'Explained by: Log GDP per capita',
+          'Explained by: Social support',
+          'Explained by: Healthy life expectancy',
+          'Explained by: Freedom to make life choices',
+          'Explained by: Generosity',
+          'Explained by: Perceptions of corruption',
+          'Dystopia + residual',
+        ];
+        const color = d3.scaleOrdinal().domain(segments).range(d3.schemeCategory10);
+
+        // Create SVG
+        const svg = d3
+          .select('body')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr('height', height + margin.top + margin.bottom)
+          .append('g')
+          .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Create scales
+        const x = d3.scaleLinear().domain([0, 8]).range([0, width]);
+
+        const y = d3
+          .scaleBand()
+          .range([height, 0])
+          .domain(data.map((d) => `${d.rank}. ${d['Country name']}`))
+          .padding(0.1);
+
+        // Create and append x-axis
+        svg
+          .append('g')
+          .attr('transform', `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll('text');
+
+        // X-axis label
+        svg
+          .append('text')
+          .attr('class', 'axis-label')
+          .attr('x', width / 2)
+          .attr('y', height + margin.bottom - 10)
+          .style('text-anchor', 'middle')
+          .text('Happiness Index');
+
+        // Create and append y-axis
+        svg.append('g').call(d3.axisLeft(y));
+
+        // Y-axis label
+        svg
+          .append('text')
+          .attr('class', 'axis-label')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', 0 - margin.left)
+          .attr('x', 0 - height / 2)
+          .attr('dy', '1em')
+          .style('text-anchor', 'middle')
+          .text('Country');
+
+        // Create tooltip
+        const tooltip = d3
+          .select('body')
+          .append('div')
+          .attr('class', 'tooltip')
+          .style('opacity', 0);
+
+        // Create and append segmented bars
+        const stack = d3.stack().keys(segments);
+        const stackedData = stack(data);
+
+        svg
+          .selectAll('.bar-group')
+          .data(stackedData)
+          .enter()
+          .append('g')
+          .attr('fill', (d) => color(d.key))
+          .selectAll('rect')
+          .data((d) => d)
+          .enter()
+          .append('rect')
+          .attr('y', (d) => y(`${d.data.rank}. ${d.data['Country name']}`))
+          .attr('x', (d) => x(d[0]))
+          .attr('width', (d) => x(d[1]) - x(d[0]))
+          .attr('height', y.bandwidth())
+          .on('mouseover', function (event, d) {
+            tooltip.transition().duration(200).style('opacity', 0.9);
+            tooltip
+              .html(createTooltipContent(d.data))
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 28 + 'px');
+          })
+          .on('mouseout', function (d) {
+            tooltip.transition().duration(500).style('opacity', 0);
+          });
+
+        // Create legend
+        const legend = svg.append('g').attr('transform', `translate(${width}, 1300)`);
+
+        const legendItems = legend
+          .selectAll('.legend-item')
+          .data(segments)
+          .enter()
+          .append('g')
+          .attr('class', 'legend-item')
+          .attr('transform', (d, i) => `translate(0, ${i * 20})`);
+
+        legendItems.append('rect').attr('width', 18).attr('height', 18).attr('fill', color);
+
+        legendItems
+          .append('text')
+          .attr('x', 24)
+          .attr('y', 9)
+          .attr('dy', '0.35em')
+          .text((d) => d);
+
+        // Function to create tooltip content
+        function createTooltipContent(d) {
+          const rank = data.indexOf(d) + 1;
+          let content = `<strong>${d['Country name']} #${rank}</strong><br/>`;
+          content += `Happines Index: <strong>${d['Ladder score']}</strong><br/>`;
+          segments.forEach((segment) => {
+            content += `<div style="background-color:${color(
+              segment
+            )};" class="legend-color"></div> ${segment}: <strong>${d[segment]}</strong><br/>`;
+          });
+          return content;
+        }
+      }
+
+      d3.csv('./data/WHR2024.csv').then(handleData);
+    </script>
+    <p>
+      Data from:
+      https://www.kaggle.com/datasets/ajaypalsinghlo/world-happiness-report-2024?select=WHR2024.csv
+    </p>
+  </body>
 </html>
