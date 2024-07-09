@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Data Viz</title>
+    <title>USA Energy Map Visualization</title>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -14,7 +15,237 @@
         align-items: center;
         margin: 0;
       }
+      #map {
+        max-width: 100%;
+        height: auto;
+      }
+      .state-label {
+        font-size: 8px;
+        pointer-events: none;
+      }
+      #yearLabel {
+        font-size: 50px;
+        font-weight: bold;
+        position: relative;
+        top: 20px;
+        color: gray;
+      }
     </style>
   </head>
-  <body></body>
+  <body>
+    <h1>USA Energy Map 1990 - 2022</h1>
+    <div id="yearLabel"></div>
+    <div id="loading"><p>Loading data...</p></div>
+    <svg id="map"></svg>
+
+    <script>
+      let mapData,
+        energyData,
+        years,
+        currentYearIndex = 0;
+      const width = 960;
+      const height = 600;
+
+      // State code to full name mapping
+      const stateCodeToName = {
+        AL: 'Alabama',
+        AK: 'Alaska',
+        AZ: 'Arizona',
+        AR: 'Arkansas',
+        CA: 'California',
+        CO: 'Colorado',
+        CT: 'Connecticut',
+        DE: 'Delaware',
+        FL: 'Florida',
+        GA: 'Georgia',
+        HI: 'Hawaii',
+        ID: 'Idaho',
+        IL: 'Illinois',
+        IN: 'Indiana',
+        IA: 'Iowa',
+        KS: 'Kansas',
+        KY: 'Kentucky',
+        LA: 'Louisiana',
+        ME: 'Maine',
+        MD: 'Maryland',
+        MA: 'Massachusetts',
+        MI: 'Michigan',
+        MN: 'Minnesota',
+        MS: 'Mississippi',
+        MO: 'Missouri',
+        MT: 'Montana',
+        NE: 'Nebraska',
+        NV: 'Nevada',
+        NH: 'New Hampshire',
+        NJ: 'New Jersey',
+        NM: 'New Mexico',
+        NY: 'New York',
+        NC: 'North Carolina',
+        ND: 'North Dakota',
+        OH: 'Ohio',
+        OK: 'Oklahoma',
+        OR: 'Oregon',
+        PA: 'Pennsylvania',
+        RI: 'Rhode Island',
+        SC: 'South Carolina',
+        SD: 'South Dakota',
+        TN: 'Tennessee',
+        TX: 'Texas',
+        UT: 'Utah',
+        VT: 'Vermont',
+        VA: 'Virginia',
+        WA: 'Washington',
+        WV: 'West Virginia',
+        WI: 'Wisconsin',
+        WY: 'Wyoming',
+      };
+
+      function getDataByYear(year) {
+        const yearData = {};
+        for (const stateCode in energyData) {
+          if (energyData[stateCode][year]) {
+            const stateName = stateCodeToName[stateCode];
+            yearData[stateName] = energyData[stateCode][year];
+          }
+        }
+        return yearData;
+      }
+
+      function drawMap(year) {
+        if (!mapData || !energyData) return;
+        const loading = document.getElementById('loading');
+        loading.style.display = 'none';
+
+        const svg = d3.select('#map').attr('width', width).attr('height', height);
+
+        svg.selectAll('*').remove();
+
+        const projection = d3
+          .geoAlbersUsa()
+          .fitSize([width, height], topojson.feature(mapData, mapData.objects.states));
+
+        const path = d3.geoPath().projection(projection);
+
+        const fuelSources = new Set();
+        for (const stateCode in energyData) {
+          for (const yearData of Object.values(energyData[stateCode])) {
+            fuelSources.add(yearData.source);
+          }
+        }
+
+        const colorScale = d3
+          .scaleOrdinal()
+          .domain(Array.from(fuelSources))
+          .range(d3.schemeCategory10);
+
+        const yearData = getDataByYear(year);
+
+        svg
+          .selectAll('path')
+          .data(topojson.feature(mapData, mapData.objects.states).features)
+          .enter()
+          .append('path')
+          .attr('d', path)
+          .attr('fill', (d) => {
+            const stateData = yearData[d.properties.name];
+            return stateData ? colorScale(stateData.source) : '#ccc';
+          })
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 0.5);
+
+        const labels = svg
+          .selectAll('.state-label')
+          .data(topojson.feature(mapData, mapData.objects.states).features)
+          .enter()
+          .append('text')
+          .attr('class', 'state-label')
+          .attr('transform', (d) => `translate(${path.centroid(d)})`)
+          .attr('dy', '.35em')
+          .text((d) => {
+            const stateData = yearData[d.properties.name];
+            return stateData ? stateData.source : '';
+          });
+
+        // Add a legend
+        const legend = svg.append('g').attr('transform', `translate(${width - 220}, 0)`);
+        const legendItems = Array.from(fuelSources);
+
+        legend
+          .selectAll('rect')
+          .data(legendItems)
+          .enter()
+          .append('rect')
+          .attr('x', 0)
+          .attr('y', (d, i) => i * 20)
+          .attr('width', 15)
+          .attr('height', 15)
+          .attr('fill', (d) => colorScale(d));
+
+        legend
+          .selectAll('text')
+          .data(legendItems)
+          .enter()
+          .append('text')
+          .attr('x', 20)
+          .attr('y', (d, i) => i * 20 + 12)
+          .text((d) => d)
+          .attr('font-size', '10px');
+
+        // Update year label
+        document.getElementById('yearLabel').textContent = year;
+      }
+
+      function startAnimation() {
+        setInterval(() => {
+          drawMap(years[currentYearIndex]);
+          currentYearIndex = (currentYearIndex + 1) % years.length;
+        }, 1000); // Change year every 1 seconds
+      }
+
+      // Load USA map data
+      d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then((usa) => {
+        mapData = usa;
+        if (mapData) {
+          startAnimation();
+        }
+      });
+
+      // Load energy data
+      d3.csv('./data/energy_capacity.csv').then((data) => {
+        const reduceData = data.reduce((acc, curr) => {
+          const fuelSource = curr['Fuel Source'];
+          const producerType = curr['Producer Type'];
+          const stateCode = curr['State Code'];
+          const year = curr['Year'];
+          const capacity = parseFloat(curr['Nameplate Capacity (Megawatts)'].replace(/,/g, ''));
+
+          if (fuelSource === 'All Sources' || producerType !== 'Total Electric Power Industry') {
+            return acc;
+          }
+
+          if (!acc[stateCode]) {
+            acc[stateCode] = {};
+          }
+
+          if (!acc[stateCode][year]) {
+            acc[stateCode][year] = {
+              capacity: capacity,
+              source: fuelSource,
+            };
+          } else {
+            if (acc[stateCode][year].capacity < capacity) {
+              acc[stateCode][year] = {
+                capacity: capacity,
+                source: fuelSource,
+              };
+            }
+          }
+
+          return acc;
+        }, {});
+        energyData = reduceData;
+        years = Object.keys(Object.values(energyData)[0]).sort();
+      });
+    </script>
+  </body>
 </html>
