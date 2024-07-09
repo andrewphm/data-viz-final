@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>USA Energy Map Visualization</title>
+    <!-- Load D3.js and TopoJSON libraries -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://unpkg.com/topojson@3"></script>
     <style>
@@ -39,6 +40,7 @@
     <svg id="map"></svg>
 
     <script>
+      // Initialize variables for storing map data, energy data, and years
       let mapData,
         energyData,
         years,
@@ -100,6 +102,7 @@
         WY: 'Wyoming',
       };
 
+      // Function to get energy data for a specific year
       function getDataByYear(year) {
         const yearData = {};
         for (const stateCode in energyData) {
@@ -111,21 +114,24 @@
         return yearData;
       }
 
+      // Function to draw the map for a given year
       function drawMap(year) {
         if (!mapData || !energyData) return;
         const loading = document.getElementById('loading');
         loading.style.display = 'none';
 
+        // Set up the SVG element
         const svg = d3.select('#map').attr('width', width).attr('height', height);
-
         svg.selectAll('*').remove();
 
+        // Create a projection for the map
         const projection = d3
           .geoAlbersUsa()
           .fitSize([width, height], topojson.feature(mapData, mapData.objects.states));
 
         const path = d3.geoPath().projection(projection);
 
+        // Get unique fuel sources
         const fuelSources = new Set();
         for (const stateCode in energyData) {
           for (const yearData of Object.values(energyData[stateCode])) {
@@ -133,6 +139,7 @@
           }
         }
 
+        // Create a color scale for fuel sources
         const colorScale = d3
           .scaleOrdinal()
           .domain(Array.from(fuelSources))
@@ -140,6 +147,7 @@
 
         const yearData = getDataByYear(year);
 
+        // Draw state boundaries and fill with colors based on energy source
         svg
           .selectAll('path')
           .data(topojson.feature(mapData, mapData.objects.states).features)
@@ -153,6 +161,7 @@
           .attr('stroke', '#fff')
           .attr('stroke-width', 0.5);
 
+        // Add labels for energy sources on each state
         const labels = svg
           .selectAll('.state-label')
           .data(topojson.feature(mapData, mapData.objects.states).features)
