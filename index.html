@@ -82,9 +82,9 @@
           .attr('transform', `translate(${margin.left},${margin.top})`);
 
         // Create scales
-        const x = d3.scaleLinear().domain([0, 8]).range([0, width]);
+        const xscale = d3.scaleLinear().domain([0, 8]).range([0, width]);
 
-        const y = d3
+        const yscale = d3
           .scaleBand()
           .range([height, 0])
           .domain(data.map((d) => `${d.rank}. ${d['Country name']}`))
@@ -94,7 +94,7 @@
         svg
           .append('g')
           .attr('transform', `translate(0,${height})`)
-          .call(d3.axisBottom(x))
+          .call(d3.axisBottom(xscale))
           .selectAll('text');
 
         // X-axis label
@@ -107,7 +107,7 @@
           .text('Happiness Index');
 
         // Create and append y-axis
-        svg.append('g').call(d3.axisLeft(y));
+        svg.append('g').call(d3.axisLeft(yscale));
 
         // Y-axis label
         svg
@@ -141,10 +141,10 @@
           .data((d) => d)
           .enter()
           .append('rect')
-          .attr('y', (d) => y(`${d.data.rank}. ${d.data['Country name']}`))
-          .attr('x', (d) => x(d[0]))
-          .attr('width', (d) => x(d[1]) - x(d[0]))
-          .attr('height', y.bandwidth())
+          .attr('y', (d) => yscale(`${d.data.rank}. ${d.data['Country name']}`))
+          .attr('x', (d) => xscale(d[0]))
+          .attr('width', (d) => xscale(d[1]) - xscale(d[0]))
+          .attr('height', yscale.bandwidth())
           .on('mouseover', function (event, d) {
             tooltip.transition().duration(200).style('opacity', 0.9);
             tooltip
